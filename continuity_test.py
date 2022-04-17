@@ -64,7 +64,7 @@ class MyNet(nn.Module):
 # test suite:
 
 
-for file in [files[0]]:
+for file in files:
     # load image
     im = cv2.imread(pjoin(data_dir, file))
     data = torch.from_numpy(
@@ -131,7 +131,7 @@ for file in [files[0]]:
             print("nLabels", nLabels, "reached minLabels", minLabels, ".")
             final = im_target.reshape(im.shape[0:2])
             file_name = file.strip('.jpg')
-            final.tofile(("./predictions/continuity/" +
+            final.tofile(("predictions/continuity/" +
                          file_name + ".csv"), sep=",")
             break
 
