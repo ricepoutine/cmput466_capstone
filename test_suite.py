@@ -1,4 +1,3 @@
-from operator import delitem
 import os
 from os.path import dirname, join as pjoin
 import scipy.io as sio
@@ -32,7 +31,6 @@ for f in os.listdir(data_dir):
 
 # consistency of tests, debug
 test_files.sort()
-print(test_files)
 mat_fname = pjoin(data_dir, '2018.mat')
 
 mat_contents = sio.loadmat(mat_fname)
@@ -74,5 +72,3 @@ cv2.imwrite("true_mask.png", im_true_rgb.reshape(im_size[0], im_size[1], 3))
 im_pred_rgb = np.array(
     [label_colours[c % max_label] for c in pred])
 cv2.imwrite("pred_mask.png", im_pred_rgb.reshape(im_size[0], im_size[1], 3))
-
-# view pred mask

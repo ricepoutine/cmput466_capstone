@@ -30,7 +30,6 @@ data_dir = pjoin(dirname(os.path.realpath(__file__)),
                  'data', 'images', 'test')
 for f in os.listdir(data_dir):
     files.append(f)
-print(files[0])
 # CNN model
 
 
