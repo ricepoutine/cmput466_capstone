@@ -30,9 +30,9 @@ data_dir = pjoin(dirname(os.path.realpath(__file__)),
                  'data', 'images', 'test')
 for f in os.listdir(data_dir):
     files.append(f)
+
+
 # CNN model
-
-
 class MyNet(nn.Module):
     def __init__(self, input_dim):
         super(MyNet, self).__init__()
@@ -64,7 +64,7 @@ class MyNet(nn.Module):
 # test suite:
 
 
-for file in files:
+for file in [files[files.index("100039.jpg")]]:
     # load image
     im = cv2.imread(pjoin(data_dir, file))
     data = torch.from_numpy(
@@ -124,7 +124,7 @@ for file in files:
         if batch_idx == maxIter - 1:
             final = im_target.reshape(im.shape[0:2])
             file_name = file.strip('.jpg')
-            final.tofile(("./predictions/continuity/" +
+            final.tofile(("predictions/continuity/" +
                          file_name + ".csv"), sep=",")
 
         if nLabels <= minLabels:

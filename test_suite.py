@@ -4,7 +4,6 @@ import scipy.io as sio
 from sklearn.metrics import confusion_matrix
 import numpy as np
 from numpy import genfromtxt
-import cv2
 
 np.random.seed(0)
 
@@ -18,49 +17,82 @@ def compute_iou(actual, pred):
     IoU = intersection / union.astype(np.float32)
     return np.mean(IoU)
 
-# 200 test images
 
-
-# load ground truth
+# load ground truths
 data_dir = pjoin(dirname(os.path.realpath(__file__)),
                  'data', 'groundTruth', 'test')
 
-test_files = []
+ground_truth_files = []
 for f in os.listdir(data_dir):
-    test_files.append(f)
+    ground_truth_files.append(f)
 
-# consistency of tests, debug
-test_files.sort()
-mat_fname = pjoin(data_dir, '2018.mat')
+# order: continuity = 0, superpixel = 1, kmeans(#cluster = 2) = 2, kmeans(#clusters = 17) = 3
+miou_list = [[], [], [], []]
 
-mat_contents = sio.loadmat(mat_fname)
-# pick best ground truth segmentation
-# number of possible true masks
-num_truths = mat_contents['groundTruth'].shape[1]
+for alg in range(4):
+    if alg == 0:
+        pred_dir = pjoin(dirname(os.path.realpath(__file__)),
+                         'predictions', 'continuity')
+    elif alg == 1:
+        pred_dir = pjoin(dirname(os.path.realpath(__file__)),
+                         'predictions', 'superpixel')
+    elif alg == 2:
+        pred_dir = pjoin(dirname(os.path.realpath(__file__)),
+                         'predictions', 'kmeans3')
+    else:
+        pred_dir = pjoin(dirname(os.path.realpath(__file__)),
+                         'predictions', 'kmeans15')
 
-groundTruth = mat_contents['groundTruth'][0, 0]
-actual = groundTruth['Segmentation'][0, 0]
-max_label = np.amax(actual)
-im_size = actual.shape
+    for file in ground_truth_files:
+        # load ground truth
+        mat_fname = pjoin(data_dir, file)
+        mat_contents = sio.loadmat(mat_fname)
 
-# load predicted mask
-pred = (genfromtxt('continuity.csv', delimiter=',')
-        ).reshape(actual.shape).astype(np.int64)
+        # dummy load to get size of image
+        dummy = mat_contents['groundTruth'][0, 0]
+        im = dummy['Segmentation'][0, 0]
+        im_size = im.shape
 
+        # load predicted mask
+        maskID = file.strip('.mat')
+        try:
+            pred = (genfromtxt((pred_dir + '\\' + maskID + '.csv'), delimiter=',')
+                    ).reshape(im_size).astype(np.int64)
+        except:
+            print("no prediction made on image id: ", maskID)
+            continue
 
-pred = pred.flatten()
-actual = actual.flatten()
+        # pick best ground truth segmentation
+        # number of possible true masks
+        num_truths = mat_contents['groundTruth'].shape[1]
+        best_miou = 0
+        for seg in range(num_truths):
+            groundTruth = mat_contents['groundTruth'][0, seg]
+            actual = groundTruth['Segmentation'][0, 0]
+            max_label = np.amax(actual)
 
-# find most frequent label in pred and set equal to ground truth label for miou measure
-for i in range(1, max_label+1):
-    indices = np.where(actual == i)[0]
-    pred_label = np.bincount(pred[indices]).argmax()
-    pred[np.where(pred == pred_label)] = i
+            pred = pred.flatten()
+            actual = actual.flatten()
 
-# calculate miou
-miou = compute_iou(actual, pred)
-print(miou)
+            # find most frequent label in pred and set equal to ground truth label for miou measure
+            for i in range(1, max_label+1):
+                indices = np.where(actual == i)[0]
+                pred_label = np.bincount(pred[indices]).argmax()
+                pred[np.where(pred == pred_label)] = i
 
+            # calculate miou
+            miou = compute_iou(actual, pred)
+            print("mIOU: ", miou)
+
+            if best_miou < miou:
+                best_miou = miou
+
+        miou_list[alg].append(best_miou)
+
+np.array(miou_list, dtype=object).tofile("test_results.csv", sep=",")
+
+"""
+# save mask as csv
 actual.tofile("true_mask.csv", sep=",")
 pred.tofile("pred_mask.csv", sep=',')
 
@@ -72,3 +104,4 @@ cv2.imwrite("true_mask.png", im_true_rgb.reshape(im_size[0], im_size[1], 3))
 im_pred_rgb = np.array(
     [label_colours[c % max_label] for c in pred])
 cv2.imwrite("pred_mask.png", im_pred_rgb.reshape(im_size[0], im_size[1], 3))
+"""
