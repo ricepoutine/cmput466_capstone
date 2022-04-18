@@ -20,14 +20,19 @@ nChannel = 100
 maxIter = 1000
 minLabels = 3
 lr = 0.1
-nConv = 2
-stepsize_sim = 1
-stepsize_con = 5
+nConv = 5
+stepsize_sim = 2
+stepsize_con = 1
 files = []
 
 # load test images
+#data_dir = pjoin(dirname(os.path.realpath(__file__)),
+#                 'data', 'images', 'test')
+
+# load CT images
 data_dir = pjoin(dirname(os.path.realpath(__file__)),
-                 'data', 'images', 'test')
+                 'CT')
+
 for f in os.listdir(data_dir):
     files.append(f)
 
@@ -64,7 +69,7 @@ class MyNet(nn.Module):
 # test suite:
 
 
-for file in [files[files.index("100039.jpg")]]:
+for file in files:
     # load image
     im = cv2.imread(pjoin(data_dir, file))
     data = torch.from_numpy(
@@ -130,7 +135,7 @@ for file in [files[files.index("100039.jpg")]]:
         if nLabels <= minLabels:
             print("nLabels", nLabels, "reached minLabels", minLabels, ".")
             final = im_target.reshape(im.shape[0:2])
-            file_name = file.strip('.jpg')
+            file_name = file.strip('.pngjp')
             final.tofile(("predictions/continuity/" +
                          file_name + ".csv"), sep=",")
             break

@@ -35,11 +35,11 @@ parser.add_argument('--stepsize_sim', metavar='SIM', default=1, type=float,
                     help='step size for similarity loss', required=False)
 parser.add_argument('--stepsize_con', metavar='CON', default=5, type=float,
                     help='step size for continuity loss')
+parser.add_argument('--batch', metavar='B', default=True, type=float,
+                help='whether or not to use batch normalization after final convolution')            
 args = parser.parse_args()
 
 # CNN model
-
-
 class MyNet(nn.Module):
     def __init__(self, input_dim):
         super(MyNet, self).__init__()
@@ -65,7 +65,7 @@ class MyNet(nn.Module):
             x = F.relu(x)
             x = self.bn2[i](x)
         x = self.conv3(x)
-        x = self.bn3(x)
+        if args.batch: x = self.bn3(x)
         return x
 
 
@@ -135,10 +135,17 @@ for batch_idx in range(args.maxIter):
     if batch_idx == args.maxIter - 1:
         final = im_target.reshape(
             im.shape[0:2])
-        final.tofile(("predictions.csv"), sep=",")
+        if args.batch: final.tofile(("single_predictions/continuity/" +
+                         (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(args.stepsize_sim) + "_" + str(args.stepsize_con) + ".csv"), sep=",")
+        else: final.tofile(("single_predictions/continuity_nobatch/" +
+                         (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(args.stepsize_sim) + "_" + str(args.stepsize_con) + ".csv"), sep=",")
 
     if nLabels <= args.minLabels:
         print("nLabels", nLabels, "reached minLabels", args.minLabels, ".")
+        if args.batch: final.tofile(("single_predictions/continuity/" +
+                         (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(args.stepsize_sim) + "_" + str(args.stepsize_con) + ".csv"), sep=",")
+        else: final.tofile(("single_predictions/continuity_nobatch/" +
+                         (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(args.stepsize_sim) + "_" + str(args.stepsize_con) + ".csv"), sep=",")
         break
 
 # save output image
@@ -150,4 +157,10 @@ if not args.visualize:
     im_target_rgb = np.array(
         [label_colours[c % args.nChannel] for c in im_target])
     im_target_rgb = im_target_rgb.reshape(im.shape).astype(np.uint8)
-cv2.imwrite("output_continuity.png", im_target_rgb)
+
+if args.batch:
+    cv2.imwrite(("single_predictions/continuity/" +
+                         (args.input).strip('.pngjg') + "_" + str(args.nConv) + "_" + str(args.stepsize_sim) + "_" + str(args.stepsize_con) + ".png"), im_target_rgb)
+else: 
+    cv2.imwrite(("single_predictions/continuity_nobatch/" +
+                         (args.input).strip('.pngjg') + "_" + str(args.nConv) + "_" + str(args.stepsize_sim) + "_" + str(args.stepsize_con) + ".png"), im_target_rgb)

@@ -26,10 +26,11 @@ ground_truth_files = []
 for f in os.listdir(data_dir):
     ground_truth_files.append(f)
 
-# order: continuity = 0, superpixel = 1, kmeans(#cluster = 2) = 2, kmeans(#clusters = 17) = 3
+# order: continuity = 0, superpixel = 1, kmeans(#cluster = 3) = 2, kmeans(#clusters = 15) = 3
 miou_list = [[], [], [], []]
 
-for alg in range(4):
+for alg in range(1):
+    """
     if alg == 0:
         pred_dir = pjoin(dirname(os.path.realpath(__file__)),
                          'predictions', 'continuity')
@@ -42,7 +43,9 @@ for alg in range(4):
     else:
         pred_dir = pjoin(dirname(os.path.realpath(__file__)),
                          'predictions', 'kmeans15')
-
+    """
+    pred_dir = pjoin(dirname(os.path.realpath(__file__)),
+                         'predictions', 'continuity_nobatch')
     for file in ground_truth_files:
         # load ground truth
         mat_fname = pjoin(data_dir, file)
@@ -56,7 +59,7 @@ for alg in range(4):
         # load predicted mask
         maskID = file.strip('.mat')
         try:
-            pred = (genfromtxt((pred_dir + '\\' + maskID + '.csv'), delimiter=',')
+            pred = (genfromtxt((pred_dir + '/' + maskID + '.csv'), delimiter=',')
                     ).reshape(im_size).astype(np.int64)
         except:
             print("no prediction made on image id: ", maskID)
@@ -89,7 +92,13 @@ for alg in range(4):
 
         miou_list[alg].append(best_miou)
 
-np.array(miou_list, dtype=object).tofile("test_results.csv", sep=",")
+"""
+np.array(miou_list[0], dtype=object).tofile("test_results_continuity.csv", sep=",")
+np.array(miou_list[1], dtype=object).tofile("test_results_superpixel.csv", sep=",")
+np.array(miou_list[2], dtype=object).tofile("test_results_kmeans3.csv", sep=",")
+np.array(miou_list[3], dtype=object).tofile("test_results_kmeans15.csv", sep=",")
+"""
+np.array(miou_list[0], dtype=object).tofile("test_results_continuity_nobatch.csv", sep=",")
 
 """
 # save mask as csv
