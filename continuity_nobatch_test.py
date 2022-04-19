@@ -1,4 +1,3 @@
-#from __future__ import print_function
 import os
 from os.path import dirname, join as pjoin
 import torch
@@ -60,6 +59,7 @@ class MyNet(nn.Module):
         x = self.conv3(x)
         #x = self.bn3(x)
         return x
+
 
 # test suite:
 for file in files:

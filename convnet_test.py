@@ -11,6 +11,7 @@ import cv2
 import sys
 import numpy as np
 import torch.nn.init
+from skimage import segmentation
 
 np.random.seed(0)
 
@@ -21,13 +22,30 @@ maxIter = 1000
 minLabels = 3
 lr = 0.1
 nConv = 5
+
+files = []
+batch = True
+
+version = "continuity"
+
+# continuity settings
 stepsize_sim = 2
 stepsize_con = 1
-files = []
+
+# superpixel settings
+compactness = 100
+num_superpixels = 10000
+
+# helper for organizing file names based on batch
+
+
+def isbatch(batch):
+    return "_nobatch" if not batch else ""
 
 # load test images
-#data_dir = pjoin(dirname(os.path.realpath(__file__)),
+# data_dir = pjoin(dirname(os.path.realpath(__file__)),
 #                 'data', 'images', 'test')
+
 
 # load CT images
 data_dir = pjoin(dirname(os.path.realpath(__file__)),
@@ -63,7 +81,8 @@ class MyNet(nn.Module):
             x = F.relu(x)
             x = self.bn2[i](x)
         x = self.conv3(x)
-        x = self.bn3(x)
+        if batch:
+            x = self.bn3(x)
         return x
 
 # test suite:
@@ -78,47 +97,70 @@ for file in files:
         data = data.cuda()
     data = Variable(data)
 
+    # similarity loss definition
+    loss_fn = torch.nn.CrossEntropyLoss()
+
+    # continuity loss definition
+    if version == "continuity":
+        loss_hpy = torch.nn.L1Loss(size_average=True)
+        loss_hpz = torch.nn.L1Loss(size_average=True)
+        HPy_target = torch.zeros(im.shape[0]-1, im.shape[1], nChannel)
+        HPz_target = torch.zeros(im.shape[0], im.shape[1]-1, nChannel)
+        if use_cuda:
+            HPy_target = HPy_target.cuda()
+            HPz_target = HPz_target.cuda()
+
+        # superpixel loss definition (slic)
+    l_inds = []
+    if version == "superpixel":
+        labels = segmentation.slic(
+            im, compactness=compactness, n_segments=num_superpixels)
+        labels = labels.reshape(im.shape[0]*im.shape[1])
+        u_labels = np.unique(labels)
+        for i in range(len(u_labels)):
+            l_inds.append(np.where(labels == u_labels[i])[0])
+
     # train
     model = MyNet(data.size(1))
     if use_cuda:
         model.cuda()
     model.train()
-
-    # similarity loss definition
-    loss_fn = torch.nn.CrossEntropyLoss()
-
-    # continuity loss definition
-    loss_hpy = torch.nn.L1Loss(size_average=True)
-    loss_hpz = torch.nn.L1Loss(size_average=True)
-
-    HPy_target = torch.zeros(im.shape[0]-1, im.shape[1], nChannel)
-    HPz_target = torch.zeros(im.shape[0], im.shape[1]-1, nChannel)
-    if use_cuda:
-        HPy_target = HPy_target.cuda()
-        HPz_target = HPz_target.cuda()
-
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     label_colours = np.random.randint(255, size=(100, 3))
 
+    # forward pass
     for batch_idx in range(maxIter):
-        # forwarding
         optimizer.zero_grad()
         output = model(data)[0]
         output = output.permute(1, 2, 0).contiguous().view(-1, nChannel)
-
-        outputHP = output.reshape((im.shape[0], im.shape[1], nChannel))
-        HPy = outputHP[1:, :, :] - outputHP[0:-1, :, :]
-        HPz = outputHP[:, 1:, :] - outputHP[:, 0:-1, :]
-        lhpy = loss_hpy(HPy, HPy_target)
-        lhpz = loss_hpz(HPz, HPz_target)
 
         ignore, target = torch.max(output, 1)
         im_target = target.data.cpu().numpy()
         nLabels = len(np.unique(im_target))
 
-        # loss
-        loss = stepsize_sim * \
-            loss_fn(output, target) + stepsize_con * (lhpy + lhpz)
+        if version == "superpixel":
+            for i in range(len(l_inds)):
+                labels_per_sp = im_target[l_inds[i]]
+                u_labels_per_sp = np.unique(labels_per_sp)
+                hist = np.zeros(len(u_labels_per_sp))
+                for j in range(len(hist)):
+                    hist[j] = len(
+                        np.where(labels_per_sp == u_labels_per_sp[j])[0])
+                im_target[l_inds[i]] = u_labels_per_sp[np.argmax(hist)]
+            target = torch.from_numpy(im_target)
+            if use_cuda:
+                target = target.cuda()
+            target = Variable(target)
+            loss = loss_fn(output, target)
+
+        if version == "continuity":
+            outputHP = output.reshape((im.shape[0], im.shape[1], nChannel))
+            HPy = outputHP[1:, :, :] - outputHP[0:-1, :, :]
+            HPz = outputHP[:, 1:, :] - outputHP[:, 0:-1, :]
+            lhpy = loss_hpy(HPy, HPy_target)
+            lhpz = loss_hpz(HPz, HPz_target)
+            loss = stepsize_sim * \
+                loss_fn(output, target) + stepsize_con * (lhpy + lhpz)
 
         loss.backward()
         optimizer.step()
@@ -129,25 +171,13 @@ for file in files:
         if batch_idx == maxIter - 1:
             final = im_target.reshape(im.shape[0:2])
             file_name = file.strip('.jpg')
-            final.tofile(("predictions/continuity/" +
+            final.tofile(("predictions/" + version + isbatch(batch) + "/" +
                          file_name + ".csv"), sep=",")
 
         if nLabels <= minLabels:
             print("nLabels", nLabels, "reached minLabels", minLabels, ".")
             final = im_target.reshape(im.shape[0:2])
             file_name = file.strip('.pngjp')
-            final.tofile(("predictions/continuity/" +
+            final.tofile(("predictions/" + version + isbatch(batch) + "/" +
                          file_name + ".csv"), sep=",")
             break
-
-"""
-    # save output image
-    output = model(data)[0]
-    output = output.permute(1, 2, 0).contiguous().view(-1, nChannel)
-    ignore, target = torch.max(output, 1)
-    im_target = target.data.cpu().numpy()
-    im_target_rgb = np.array(
-        [label_colours[c % nChannel] for c in im_target])
-    im_target_rgb = im_target_rgb.reshape(im.shape).astype(np.uint8)
-    cv2.imwrite("output_continuity.png", im_target_rgb)
-"""
