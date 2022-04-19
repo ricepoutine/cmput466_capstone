@@ -39,7 +39,7 @@ for k in clusters:
         # extract predicted mask by taking only 1 color value from image reconstruction
         file_name = file.strip('.jpg')
         segmented_image[:, :, 0].tofile(
-            ("predictions/kmeans"+str(k)+"/" + file_name + ".csv"), sep=",")
+            ("predictions/test/kmeans"+str(k)+"/" + file_name + ".csv"), sep=",")
 
         # view image
         cv2.imwrite("k-means_output.png", segmented_image)

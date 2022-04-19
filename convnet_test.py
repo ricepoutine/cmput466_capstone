@@ -17,19 +17,21 @@ np.random.seed(0)
 
 use_cuda = torch.cuda.is_available()
 
+# using best hyperparameters from test results on CT image
 nChannel = 100
-maxIter = 1000
+maxIter = 10
 minLabels = 3
 lr = 0.1
-nConv = 5
+nConv = 6
 
 files = []
 batch = True
 
 version = "continuity"
+test_or_ct = "CT"  # CT or test
 
 # continuity settings
-stepsize_sim = 2
+stepsize_sim = 1.5
 stepsize_con = 1
 
 # superpixel settings
@@ -42,14 +44,16 @@ num_superpixels = 10000
 def isbatch(batch):
     return "_nobatch" if not batch else ""
 
-# load test images
-# data_dir = pjoin(dirname(os.path.realpath(__file__)),
-#                 'data', 'images', 'test')
 
+if test_or_ct == "CT":
+    # load CT images
+    data_dir = pjoin(dirname(os.path.realpath(__file__)),
+                     'CT')
+elif test_or_ct == "test":
+    # load test images
+    data_dir = pjoin(dirname(os.path.realpath(__file__)),
+                     'data', 'images', 'test')
 
-# load CT images
-data_dir = pjoin(dirname(os.path.realpath(__file__)),
-                 'CT')
 
 for f in os.listdir(data_dir):
     files.append(f)
@@ -170,14 +174,25 @@ for file in files:
 
         if batch_idx == maxIter - 1:
             final = im_target.reshape(im.shape[0:2])
-            file_name = file.strip('.jpg')
-            final.tofile(("predictions/" + version + isbatch(batch) + "/" +
+            file_name = file.strip('.pngjp')
+            final.tofile(("predictions/" + test_or_ct + "/" + version + isbatch(batch) + "/" +
                          file_name + ".csv"), sep=",")
 
         if nLabels <= minLabels:
             print("nLabels", nLabels, "reached minLabels", minLabels, ".")
             final = im_target.reshape(im.shape[0:2])
             file_name = file.strip('.pngjp')
-            final.tofile(("predictions/" + version + isbatch(batch) + "/" +
+            final.tofile(("predictions/" + test_or_ct + "/" + version + isbatch(batch) + "/" +
                          file_name + ".csv"), sep=",")
             break
+
+    if test_or_ct == "CT":
+        output = model(data)[0]
+        output = output.permute(1, 2, 0).contiguous().view(-1, nChannel)
+        ignore, target = torch.max(output, 1)
+        im_target = target.data.cpu().numpy()
+        im_target_rgb = np.array(
+            [label_colours[c % nChannel] for c in im_target])
+        im_target_rgb = im_target_rgb.reshape(im.shape).astype(np.uint8)
+        cv2.imwrite(("single_predictions/continuity/" +
+                    (file).strip('.pngjg') + ".png"), im_target_rgb)

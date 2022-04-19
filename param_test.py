@@ -11,6 +11,8 @@ import sys
 import numpy as np
 import torch.nn.init
 
+# continuity only, superpixel performed poorly
+
 np.random.seed(0)
 
 use_cuda = torch.cuda.is_available()
@@ -21,14 +23,14 @@ minLabels = 3
 lr = 0.1
 nConv = [4, 5, 6, 7]
 stepsize_sim = [1.5, 2, 2.5, 3]
-stepsize_con = [1, 1,5, 2]
+stepsize_con = [1, 1, 5, 2]
 
 parser = argparse.ArgumentParser(
     description='PyTorch Unsupervised Segmentation')
 parser.add_argument('--input', metavar='FILENAME',
                     help='input image file name', required=True)
 parser.add_argument('--batch', metavar='B', default=True, type=float,
-                help='whether or not to use batch normalization after final convolution')            
+                    help='whether or not to use batch normalization after final convolution')
 args = parser.parse_args()
 
 
@@ -58,7 +60,8 @@ class MyNet(nn.Module):
             x = F.relu(x)
             x = self.bn2[i](x)
         x = self.conv3(x)
-        if args.batch: x = self.bn3(x)
+        if args.batch:
+            x = self.bn3(x)
         return x
 
 
@@ -101,7 +104,8 @@ for nc in range(len(nConv)):
                 # forwarding
                 optimizer.zero_grad()
                 output = model(data, nConv[nc])[0]
-                output = output.permute(1, 2, 0).contiguous().view(-1, nChannel)
+                output = output.permute(
+                    1, 2, 0).contiguous().view(-1, nChannel)
 
                 outputHP = output.reshape((im.shape[0], im.shape[1], nChannel))
                 HPy = outputHP[1:, :, :] - outputHP[0:-1, :, :]
@@ -112,10 +116,10 @@ for nc in range(len(nConv)):
                 ignore, target = torch.max(output, 1)
                 im_target = target.data.cpu().numpy()
                 nLabels = len(np.unique(im_target))
-                # print(im_target.reshape(im.shape[0:2]))
                 im_target_rgb = np.array(
                     [label_colours[c % nChannel] for c in im_target])
-                im_target_rgb = im_target_rgb.reshape(im.shape).astype(np.uint8)
+                im_target_rgb = im_target_rgb.reshape(
+                    im.shape).astype(np.uint8)
 
                 # loss
                 loss = stepsize_sim[ss] * \
@@ -125,32 +129,15 @@ for nc in range(len(nConv)):
                 optimizer.step()
 
                 print(batch_idx, '/', maxIter, '|',
-                    ' label num :', nLabels, ' | loss :', loss.item())
+                      ' label num :', nLabels, ' | loss :', loss.item())
 
-                #if batch_idx == maxIter - 1:
-                """
-                final = im_target.reshape(
-                    im.shape[0:2])
-                if args.batch: final.tofile(("single_predictions/continuity/" +
-                                    (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".csv"), sep=",")
-                else: final.tofile(("single_predictions/continuity_nobatch/" +
-                                    (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".csv"), sep=",")
-                """
                 if nLabels <= minLabels:
                     print("nLabels", nLabels, "reached minLabels", minLabels, ".")
-                    """
-                    final = im_target.reshape(
-                        im.shape[0:2])
-                    if args.batch: final.tofile(("single_predictions/continuity/" +
-                                    (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".csv"), sep=",")
-                    else: final.tofile(("single_predictions/continuity_nobatch/" +
-                                    (args.input).strip('.pngjp') + "_" + str(args.nConv) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".csv"), sep=",")
-                    """
                     break
 
             if args.batch:
                 cv2.imwrite(("single_predictions/continuity/" +
-                                    (args.input).strip('.pngjg') + "_" + str(nConv[nc]) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".png"), im_target_rgb)
-            else: 
+                             (args.input).strip('.pngjg') + "_" + str(nConv[nc]) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".png"), im_target_rgb)
+            else:
                 cv2.imwrite(("single_predictions/continuity_nobatch/" +
-                                    (args.input).strip('.pngjg') + "_" + str(nConv[nc]) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".png"), im_target_rgb)
+                             (args.input).strip('.pngjg') + "_" + str(nConv[nc]) + "_" + str(stepsize_sim[ss]) + "_" + str(stepsize_con[sc]) + ".png"), im_target_rgb)
