@@ -19,7 +19,7 @@ use_cuda = torch.cuda.is_available()
 
 # using best hyperparameters from test results on CT image
 nChannel = 100
-maxIter = 10
+maxIter = 1000
 minLabels = 3
 lr = 0.1
 nConv = 6
